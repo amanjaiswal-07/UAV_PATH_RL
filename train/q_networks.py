@@ -49,3 +49,4 @@ class DuelingQNetwork(nn.Module):
         # Combine V(s) and A(s,a) into Q(s,a)
         q_vals = values + (advantages - advantages.mean(dim=1, keepdim=True))
         return q_vals
+        #check if it upload on github or not
