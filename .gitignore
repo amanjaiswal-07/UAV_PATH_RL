@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+*.npy
+*.pth
+training_metrics.png
+training_metrics_detailed.png
