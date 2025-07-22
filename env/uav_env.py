@@ -26,12 +26,16 @@ class UAVEnv(gym.Env):
             ]),
             dtype=np.float32
         )
-
+        self.max_steps = 200
         self.snr_threshold = 0.5
         self.alpha = 1.0
         self.beta = 2.0
         self.gamma = 5.0
         self.delta = 1.0
+
+        self.users = np.load("data/users.npy")
+        self.obstacles = np.load("data/obstacles.npy", allow_pickle=True)
+        self.snr_map = np.load("data/channel_map.npy")
 
         self.reset()
 
@@ -39,12 +43,10 @@ class UAVEnv(gym.Env):
         self.uav_pos = np.array([0, 0, 1])
         self.goal = np.array([19, 19, 1])
         self.battery = 1.0
+        self.current_step = 0 
         self.covered_area = set()
         self.covered_area.add(tuple(self.uav_pos[:2]))
 
-        self.users = np.load("data/users.npy")
-        self.obstacles = np.load("data/obstacles.npy", allow_pickle=True)
-        self.snr_map = np.load("data/channel_map.npy")
         self.trajectory = [tuple(self.uav_pos)]
         self.collisions = []  # Track attempted blocked moves
         return self.get_state()
@@ -54,10 +56,13 @@ class UAVEnv(gym.Env):
         snr = self.snr_map[x, y, z]
         coverage_ratio = len(self.covered_area) / (self.grid_size[0] * self.grid_size[1])
         distance = np.linalg.norm(self.goal - self.uav_pos)
-        obstacle_risk = self.check_obstacle(self.uav_pos)
-        return np.array([x, y, z, self.battery, snr, coverage_ratio, distance, obstacle_risk], dtype=np.float32)
+        # obstacle_risk = self.check_obstacle(self.uav_pos)
+        obstacle_proximity = self.get_obstacle_proximity(self.uav_pos) # New way
+        return np.array([x, y, z, self.battery, snr, coverage_ratio, distance, obstacle_proximity], dtype=np.float32)
 
     def step(self, action):
+        self.current_step += 1
+
         move_map = {
             0: [0, 0, 1],
             1: [0, 0, -1],
@@ -89,7 +94,21 @@ class UAVEnv(gym.Env):
 
         snr = self.snr_map[tuple(self.uav_pos)]
         reward = self.compute_reward(snr, is_new_area, collision, energy_used)
-        done = np.array_equal(self.uav_pos, self.goal) or self.battery <= 0
+        # done = np.array_equal(self.uav_pos, self.goal) or self.battery <= 0
+
+        done = False
+        # Check for terminal conditions and add large final rewards/penalties
+        if np.array_equal(self.uav_pos, self.goal):
+            print("Goal Reached!")
+            reward += 100  # Large positive reward for reaching the goal
+            done = True
+        elif self.battery <= 0:
+            print("Out of battery.")
+            reward -= 50  # Large penalty for running out of battery
+            done = True
+        elif self.current_step >= self.max_steps:
+            print("Time limit reached.")
+            done = True # End episode if it takes too long
 
         return self.get_state(), reward, done, {}
 
@@ -104,12 +123,25 @@ class UAVEnv(gym.Env):
         reward -= self.delta * energy_used
         return reward
 
-    def check_obstacle(self, pos):
+    # def check_obstacle(self, pos):
+    #     for box in self.obstacles:
+    #         (x1, y1, z1), (x2, y2, z2) = box
+    #         if x1 <= pos[0] <= x2 and y1 <= pos[1] <= y2 and z1 <= pos[2] <= z2:
+    #             return 1.0
+    #     return 0.0
+
+    def get_obstacle_proximity(self, pos):
+        min_dist = np.linalg.norm(self.grid_size) # Max possible distance
         for box in self.obstacles:
+            # Basic distance to the center of the box
+            # A more accurate calculation would be distance to the box surface
             (x1, y1, z1), (x2, y2, z2) = box
-            if x1 <= pos[0] <= x2 and y1 <= pos[1] <= y2 and z1 <= pos[2] <= z2:
-                return 1.0
-        return 0.0
+            center = np.array([(x1+x2)/2, (y1+y2)/2, (z1+z2)/2])
+            dist = np.linalg.norm(pos - center)
+            if dist < min_dist:
+                min_dist = dist
+        # Normalize the distance to be between 0 and 1
+        return min_dist / np.linalg.norm(self.grid_size)
 
     def render_2d(self, save=False, frame_id=0):
         fig, ax = plt.subplots(figsize=(8, 6))
