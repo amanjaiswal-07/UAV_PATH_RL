@@ -29,3 +29,15 @@ class PrioritizedReplayBuffer:
         weights /= weights.max()
 
         return samples, indices, weights
+    
+    def update_priorities(self, batch_indices, td_errors):
+        """
+        Update the priorities of the sampled experiences after a training step.
+        """
+        # Ensure errors are positive and add a small epsilon to avoid zero priority
+        priorities = np.abs(td_errors) + self.epsilon
+        
+        for idx, priority in zip(batch_indices, priorities):
+            # Ensure index is within the valid range
+            if idx < len(self.priorities):
+                self.priorities[idx] = priority

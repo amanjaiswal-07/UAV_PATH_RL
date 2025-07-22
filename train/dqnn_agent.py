@@ -4,6 +4,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from collections import deque
 from q_networks import QNetwork, DuelingQNetwork
 from prioritized_replay import PrioritizedReplayBuffer
 
@@ -35,7 +36,10 @@ class DQNNAgent:
             self.replay_buffer = PrioritizedReplayBuffer(self.replay_capacity)
             self.use_per = True
         else:
-            self.replay_buffer = []
+            # self.replay_buffer = []
+            # self.use_per = False
+            # Use deque for an efficient standard buffer
+            self.replay_buffer = deque(maxlen=self.replay_capacity)
             self.use_per = False
 
     # def select_action(self, state):
@@ -59,8 +63,8 @@ class DQNNAgent:
         if self.use_per:
             self.replay_buffer.add(*transition)
         else:
-            if len(self.replay_buffer) >= self.replay_capacity:
-                self.replay_buffer.pop(0)
+            # if len(self.replay_buffer) >= self.replay_capacity:
+            #     self.replay_buffer.pop(0)
             self.replay_buffer.append(transition)
 
     def train(self):
@@ -89,7 +93,21 @@ class DQNNAgent:
                 next_Q = self.target_net(next_states).max(1, keepdim=True)[0]
             target_Q = rewards + self.gamma * (1 - dones) * next_Q
 
-        loss = self.loss_fn(curr_Q, target_Q)
+        # loss = self.loss_fn(curr_Q, target_Q)
+        if self.use_per:
+            # Calculate TD errors (the difference between target and current Q values)
+            td_errors = target_Q - curr_Q
+
+            # Calculate the weighted MSE loss
+            # The loss for each sample is squared error, multiplied by its importance weight
+            loss = (td_errors.pow(2) * weights).mean()
+
+            # Update the priorities in the replay buffer with the new errors
+            # We detach errors from the graph before converting to numpy
+            self.replay_buffer.update_priorities(indices, td_errors.detach().squeeze().cpu().numpy())
+        else:
+            # Original loss calculation for the standard replay buffer
+            loss = self.loss_fn(curr_Q, target_Q)
 
         self.optimizer.zero_grad()
         loss.backward()
@@ -99,5 +117,5 @@ class DQNNAgent:
         if self.step_count % self.target_update_freq == 0:
             self.target_net.load_state_dict(self.q_net.state_dict())
 
-        self.epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_decay)
+        # self.epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_decay)
     
