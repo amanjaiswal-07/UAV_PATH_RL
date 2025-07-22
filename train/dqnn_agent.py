@@ -9,7 +9,7 @@ from q_networks import QNetwork, DuelingQNetwork
 from prioritized_replay import PrioritizedReplayBuffer
 
 class DQNNAgent:
-    def __init__(self, state_dim, action_dim, dueling=False, double=True, prioritized=False, target_update_freq=100):
+    def __init__(self, state_dim, action_dim, dueling=True, double=True, prioritized=False, target_update_freq=100):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

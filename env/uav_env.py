@@ -51,15 +51,26 @@ class UAVEnv(gym.Env):
         self.collisions = []  # Track attempted blocked moves
         return self.get_state()
 
+    # def get_state(self):
+    #     x, y, z = self.uav_pos
+    #     snr = self.snr_map[x, y, z]
+    #     coverage_ratio = len(self.covered_area) / (self.grid_size[0] * self.grid_size[1])
+    #     distance = np.linalg.norm(self.goal - self.uav_pos)
+    #     # obstacle_risk = self.check_obstacle(self.uav_pos)
+    #     obstacle_proximity = self.get_obstacle_proximity(self.uav_pos) # New way
+    #     return np.array([x, y, z, self.battery, snr, coverage_ratio, distance, obstacle_proximity], dtype=np.float32)
+    # This is the new, corrected get_state method
     def get_state(self):
         x, y, z = self.uav_pos
-        snr = self.snr_map[x, y, z]
+        snr = self.snr_map[tuple(self.uav_pos)]
         coverage_ratio = len(self.covered_area) / (self.grid_size[0] * self.grid_size[1])
         distance = np.linalg.norm(self.goal - self.uav_pos)
-        # obstacle_risk = self.check_obstacle(self.uav_pos)
-        obstacle_proximity = self.get_obstacle_proximity(self.uav_pos) # New way
+        
+        # Use your new proximity function for the state representation
+        obstacle_proximity = self.get_obstacle_proximity(self.uav_pos)
+        
         return np.array([x, y, z, self.battery, snr, coverage_ratio, distance, obstacle_proximity], dtype=np.float32)
-
+    
     def step(self, action):
         self.current_step += 1
 
@@ -123,12 +134,12 @@ class UAVEnv(gym.Env):
         reward -= self.delta * energy_used
         return reward
 
-    # def check_obstacle(self, pos):
-    #     for box in self.obstacles:
-    #         (x1, y1, z1), (x2, y2, z2) = box
-    #         if x1 <= pos[0] <= x2 and y1 <= pos[1] <= y2 and z1 <= pos[2] <= z2:
-    #             return 1.0
-    #     return 0.0
+    def check_obstacle(self, pos):
+        for box in self.obstacles:
+            (x1, y1, z1), (x2, y2, z2) = box
+            if x1 <= pos[0] <= x2 and y1 <= pos[1] <= y2 and z1 <= pos[2] <= z2:
+                return 1.0
+        return 0.0
 
     def get_obstacle_proximity(self, pos):
         min_dist = np.linalg.norm(self.grid_size) # Max possible distance
