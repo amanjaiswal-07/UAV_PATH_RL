@@ -13,10 +13,10 @@ class DQNNAgent:
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.gamma = 0.99
-        self.lr = 1e-3
+        self.gamma = 0.99 #changed in phase 4
+        self.lr = 1e-4 #changed in phase 4
         self.batch_size = 64
-        self.replay_capacity = 10000
+        self.replay_capacity = 50000  #change in p4
         self.epsilon = 1.0
         self.epsilon_min = 0.05
         self.epsilon_decay = 0.997

@@ -30,7 +30,7 @@ class UAVEnv(gym.Env):
         self.snr_threshold = 0.5
         self.alpha = 1.0
         self.beta = 2.0
-        self.gamma = 5.0
+        self.gamma = 25.0
         self.delta = 1.0
 
         self.users = np.load("data/users.npy")
@@ -74,6 +74,10 @@ class UAVEnv(gym.Env):
     def step(self, action):
         self.current_step += 1
 
+        # Store distance before moving
+        prev_dist_to_goal = np.linalg.norm(self.uav_pos - self.goal)
+        info = {'collision': False} # For accurate collision counting
+
         move_map = {
             0: [0, 0, 1],
             1: [0, 0, -1],
@@ -99,19 +103,23 @@ class UAVEnv(gym.Env):
         else:
             self.collisions.append(tuple(new_pos))       # Track attempted blocked move
 
+        # Calculate how much closer (or further) we got to the goal
+        current_dist_to_goal = np.linalg.norm(self.uav_pos - self.goal)
+        dist_improvement = prev_dist_to_goal - current_dist_to_goal
+
         is_new_area = tuple(self.uav_pos[:2]) not in self.covered_area
         if is_new_area:
             self.covered_area.add(tuple(self.uav_pos[:2]))
 
         snr = self.snr_map[tuple(self.uav_pos)]
-        reward = self.compute_reward(snr, is_new_area, collision, energy_used)
+        reward = self.compute_reward(snr, is_new_area, collision, energy_used,dist_improvement)
         # done = np.array_equal(self.uav_pos, self.goal) or self.battery <= 0
 
         done = False
         # Check for terminal conditions and add large final rewards/penalties
         if np.array_equal(self.uav_pos, self.goal):
             print("Goal Reached!")
-            reward += 100  # Large positive reward for reaching the goal
+            reward += 500  # Large positive reward for reaching the goal(change 100 to 500)
             done = True
         elif self.battery <= 0:
             print("Out of battery.")
@@ -123,8 +131,12 @@ class UAVEnv(gym.Env):
 
         return self.get_state(), reward, done, {}
 
-    def compute_reward(self, snr, is_new_area, collision, energy_used):
+    def compute_reward(self, snr, is_new_area, collision, energy_used,dist_improvement):
         reward = 0.0
+
+        # Add the new reward for getting closer to the goal
+        reward += dist_improvement * 2.0 # The 0.5 is a new weight you can tune
+
         if snr > self.snr_threshold:
             reward += self.alpha
         if is_new_area:
