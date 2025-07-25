@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from dqnn_agent import DQNNAgent
 
-def train_dqn(env, episodes=1500, max_steps=100):
+def train_dqn(env, episodes=2000, max_steps=100):
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.n
     agent = DQNNAgent(state_dim, action_dim, dueling=True, double=True, prioritized=False ,target_update_freq=1000)
