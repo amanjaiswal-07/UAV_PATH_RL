@@ -88,11 +88,11 @@ def evaluate_agent(model_path, env, num_episodes=100):
 
 if __name__ == "__main__":
     # 1. Create the environment
-    env = UAVEnv()
+    env = UAVEnv(data_dir="data_unseen")
     
     # 2. IMPORTANT: Rename your best model file to "best_model.pth"
     #    or change the path below to match your file name.
-    best_model_path = "dqnn_uav_model.pth"
+    best_model_path = "dqnn_uav_model_randomized_final.pth"
     
     # 3. Run the evaluation function
     evaluate_agent(best_model_path, env)

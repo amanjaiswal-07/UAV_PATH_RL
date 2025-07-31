@@ -2,5 +2,7 @@ __pycache__/
 *.pyc
 *.npy
 *.pth
+*.png
+*.gif
 training_metrics.png
 training_metrics_detailed.png

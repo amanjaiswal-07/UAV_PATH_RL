@@ -5,8 +5,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from collections import deque
-from q_networks import QNetwork, DuelingQNetwork
-from prioritized_replay import PrioritizedReplayBuffer
+from train.q_networks import QNetwork, DuelingQNetwork
+from train.prioritized_replay import PrioritizedReplayBuffer
 
 class DQNNAgent:
     def __init__(self, state_dim, action_dim, dueling=True, double=True, prioritized=False, target_update_freq=100):

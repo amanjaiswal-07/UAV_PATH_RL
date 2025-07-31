@@ -5,7 +5,7 @@ from gym import spaces
 import matplotlib.pyplot as plt
 
 class UAVEnv(gym.Env):
-    def __init__(self):
+    def __init__(self):#change
         super(UAVEnv, self).__init__()
 
         self.grid_size = np.array([20, 20, 5])
@@ -29,17 +29,33 @@ class UAVEnv(gym.Env):
         self.max_steps = 200
         self.snr_threshold = 0.5
         self.alpha = 1.0
-        self.beta = 2.0
+        self.beta = 10.0# 2.0 previously 
         self.gamma = 25.0
         self.delta = 1.0
 
-        self.users = np.load("data/users.npy")
-        self.obstacles = np.load("data/obstacles.npy", allow_pickle=True)
-        self.snr_map = np.load("data/channel_map.npy")
+        # self.users = np.load("data/users.npy")
+        # self.obstacles = np.load("data/obstacles.npy", allow_pickle=True)
+        # self.snr_map = np.load("data/channel_map.npy")
+        #change
+        # self.users = np.load(os.path.join(data_dir, "users.npy"))
+        # self.obstacles = np.load(os.path.join(data_dir, "obstacles.npy"), allow_pickle=True)
+        # self.snr_map = np.load(os.path.join(data_dir, "channel_map.npy"))
+        #change
 
-        self.reset()
+        self.users = None
+        self.obstacles = None
+        self.snr_map = None
+        # self.reset()
 
-    def reset(self):
+    def reset(self, users=None, obstacles=None, snr_map=None):#change
+        #change
+        if users is not None:
+            self.users = users
+        if obstacles is not None:
+            self.obstacles = obstacles
+        if snr_map is not None:
+            self.snr_map = snr_map
+        #change
         self.uav_pos = np.array([0, 0, 1])
         self.goal = np.array([19, 19, 1])
         self.battery = 1.0
@@ -92,17 +108,24 @@ class UAVEnv(gym.Env):
         new_pos = self.uav_pos + np.array(move)
         new_pos = np.clip(new_pos, [0, 0, 0], self.grid_size - 1)
 
-        collision = self.check_obstacle(new_pos)
+        collision = bool(self.check_obstacle(new_pos))
         energy_used = 0.01 if action != 6 else 0.005
         self.battery -= energy_used
         self.battery = max(self.battery, 0)
 
-        if not collision:
-            self.uav_pos = new_pos
-            self.trajectory.append(tuple(self.uav_pos))  # Only track when move happens
-        else:
-            self.collisions.append(tuple(new_pos))       # Track attempted blocked move
+        # if not collision:
+        #     self.uav_pos = new_pos
+        #     self.trajectory.append(tuple(self.uav_pos))  # Only track when move happens
+        # else:
+        #     self.collisions.append(tuple(new_pos))       # Track attempted blocked move
 
+        if collision:
+            self.collisions.append(tuple(new_pos))       # Log the blocked move
+            info['collision'] = True                     # ✅ Important fix
+        else:
+            self.uav_pos = new_pos
+            self.trajectory.append(tuple(self.uav_pos))
+        
         # Calculate how much closer (or further) we got to the goal
         current_dist_to_goal = np.linalg.norm(self.uav_pos - self.goal)
         dist_improvement = prev_dist_to_goal - current_dist_to_goal
@@ -129,7 +152,7 @@ class UAVEnv(gym.Env):
             print("Time limit reached.")
             done = True # End episode if it takes too long
 
-        return self.get_state(), reward, done, {}
+        return self.get_state(), reward, done, info
 
     def compute_reward(self, snr, is_new_area, collision, energy_used,dist_improvement):
         reward = 0.0
@@ -142,9 +165,22 @@ class UAVEnv(gym.Env):
         if is_new_area:
             reward += self.beta
         if collision:
-            reward -= self.gamma
+            # reward -= self.gamma
+            reward -= self.gamma * (1 + 0.1 * self.current_step / self.max_steps)
         reward -= self.delta * energy_used
-        return reward
+
+        #chnage with gpt
+        reward -= 0.01
+        coverage_threshold = 0.15 * self.grid_size[0] * self.grid_size[1]
+        if len(self.covered_area) > coverage_threshold:
+                reward += 5
+
+        # Penalty for taking too long
+        if self.current_step > 0.8 * self.max_steps:
+            reward -= 10
+
+        # return reward
+        return np.clip(reward, -100, 100)
 
     def check_obstacle(self, pos):
         for box in self.obstacles:
@@ -257,4 +293,3 @@ class UAVEnv(gym.Env):
 
         ax.legend()
         plt.show()
-
